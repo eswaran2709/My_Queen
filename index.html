@@ -441,6 +441,8 @@
         ];
 
         let noBtnClicks = 0;
+        let isTeleporting = false; // flag to prevent conflicts during teleport
+
 
         // Load images into gallery
         function loadImages() {
@@ -468,8 +470,9 @@
             location.reload();
         });
 
-        // Make No button run away from cursor
+        // Make No button run away from cursor (light dodge) but allow teleport on hover
         document.addEventListener('mousemove', (e) => {
+            if (isTeleporting) return;
             const noBtnRect = noBtn.getBoundingClientRect();
             const noBtnCenterX = noBtnRect.left + noBtnRect.width / 2;
             const noBtnCenterY = noBtnRect.top + noBtnRect.height / 2;
@@ -479,10 +482,10 @@
                 Math.pow(e.clientY - noBtnCenterY, 2)
             );
 
-            // If cursor is within 150px of the button, make it run away
-            if (distance < 150) {
+            // If cursor is within 120px of the button, gently push it away
+            if (distance < 120) {
                 const angle = Math.atan2(noBtnCenterY - e.clientY, noBtnCenterX - e.clientX);
-                const moveDistance = 120;
+                const moveDistance = 100;
                 
                 let newX = noBtnCenterX + Math.cos(angle) * moveDistance;
                 let newY = noBtnCenterY + Math.sin(angle) * moveDistance;
@@ -495,6 +498,50 @@
                 noBtn.style.left = newX + 'px';
                 noBtn.style.top = newY + 'px';
             }
+        });
+
+        // When the cursor actually hovers the No button, teleport it to the opposite side
+        noBtn.addEventListener('mouseenter', (e) => {
+            if (isTeleporting) return;
+            isTeleporting = true;
+
+            // Fade out quickly
+            noBtn.style.transition = 'opacity 0.18s ease, left 0.25s ease, top 0.25s ease';
+            noBtn.style.opacity = '0';
+            noBtn.style.pointerEvents = 'none';
+
+            setTimeout(() => {
+                const rect = noBtn.getBoundingClientRect();
+                const btnCenterX = rect.left + rect.width / 2;
+                const btnCenterY = rect.top + rect.height / 2;
+
+                // Angle from cursor to button center
+                const angle = Math.atan2(btnCenterY - e.clientY, btnCenterX - e.clientX);
+                // Opposite side relative to cursor
+                const angleOpp = angle + Math.PI;
+                const moveDistance = Math.max(220, Math.min(window.innerWidth, window.innerHeight) / 3);
+
+                let newCenterX = e.clientX + Math.cos(angleOpp) * moveDistance;
+                let newCenterY = e.clientY + Math.sin(angleOpp) * moveDistance;
+
+                // Clamp inside viewport with some padding
+                newCenterX = Math.max(rect.width / 2 + 12, Math.min(window.innerWidth - rect.width / 2 - 12, newCenterX));
+                newCenterY = Math.max(rect.height / 2 + 12, Math.min(window.innerHeight - rect.height / 2 - 12, newCenterY));
+
+                const newLeft = newCenterX - rect.width / 2;
+                const newTop = newCenterY - rect.height / 2;
+
+                noBtn.style.position = 'fixed';
+                noBtn.style.left = newLeft + 'px';
+                noBtn.style.top = newTop + 'px';
+
+                // Fade back in and re-enable interactions
+                requestAnimationFrame(() => {
+                    noBtn.style.opacity = '1';
+                    noBtn.style.pointerEvents = 'auto';
+                    setTimeout(() => { isTeleporting = false; }, 260);
+                });
+            }, 180);
         });
 
         // Handle No button click (with reduced response)
